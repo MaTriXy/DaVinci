@@ -20,7 +20,7 @@ import java.io.OutputStream;
 public class DiskLruImageCache {
 
     private DiskLruCache mDiskCache;
-    private Bitmap.CompressFormat mCompressFormat = Bitmap.CompressFormat.JPEG;
+    private Bitmap.CompressFormat mCompressFormat = Bitmap.CompressFormat.PNG;
     private int mCompressQuality = 70;
     private static final int APP_VERSION = 1;
     private static final int VALUE_COUNT = 1;
@@ -42,6 +42,8 @@ public class DiskLruImageCache {
             throws IOException, FileNotFoundException {
         OutputStream out = null;
         try {
+            bitmap.setHasAlpha(true);
+            //bitmap.setConfig(Bitmap.Config.ARGB_8888);
             out = new BufferedOutputStream(editor.newOutputStream(0), IO_BUFFER_SIZE);
             return bitmap.compress(mCompressFormat, mCompressQuality, out);
         } finally {
@@ -76,13 +78,13 @@ public class DiskLruImageCache {
             if (writeBitmapToFile(data, editor)) {
                 mDiskCache.flush();
                 editor.commit();
-                Log.d("cache_test_DISK_", "image put on disk cache " + key);
+                Log.d(TAG, "image put on disk cache " + key);
             } else {
                 editor.abort();
-                Log.d("cache_test_DISK_", "ERROR on: image put on disk cache " + key);
+                Log.d(TAG, "ERROR on: image put on disk cache " + key);
             }
         } catch (IOException e) {
-            Log.d("cache_test_DISK_", "ERROR on: image put on disk cache " + key);
+            Log.d(TAG, "ERROR on: image put on disk cache " + key);
             try {
                 if (editor != null) {
                     editor.abort();
@@ -107,7 +109,12 @@ public class DiskLruImageCache {
             if (in != null) {
                 final BufferedInputStream buffIn =
                         new BufferedInputStream(in, IO_BUFFER_SIZE);
-                bitmap = BitmapFactory.decodeStream(buffIn);
+
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+                options.inPremultiplied = true;
+                bitmap = BitmapFactory.decodeStream(buffIn,null,options);
+                bitmap.setHasAlpha(true);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -117,7 +124,7 @@ public class DiskLruImageCache {
             }
         }
 
-        Log.d("cache_test_DISK_", bitmap == null ? "" : "image read from disk " + key);
+        Log.d(TAG, bitmap == null ? "" : "image read from disk " + key);
 
         return bitmap;
 
@@ -143,7 +150,7 @@ public class DiskLruImageCache {
     }
 
     public void clearCache() {
-        Log.d("cache_test_DISK_", "disk cache CLEARED");
+        Log.d(TAG, "disk cache CLEARED");
         try {
             mDiskCache.delete();
         } catch (IOException e) {

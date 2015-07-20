@@ -6,12 +6,15 @@ import android.os.Bundle;
 import android.support.wearable.view.DotsPageIndicator;
 import android.support.wearable.view.GridViewPager;
 import android.util.Log;
+import android.widget.ImageView;
 
 import com.github.florent37.davinci.DaVinci;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.MessageEvent;
@@ -35,6 +38,8 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 
     protected GoogleApiClient mApiClient;
 
+    private ImageView mImageView;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -43,6 +48,10 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
         pager = (GridViewPager) findViewById(R.id.pager);
         dotsPageIndicator = (DotsPageIndicator) findViewById(R.id.page_indicator);
         dotsPageIndicator.setPager(pager);
+
+        mImageView = (ImageView) findViewById(R.id.imageWithTransparency);
+
+        DaVinci.with(this).load("http://www.seomofo.com/downloads/new-google-logo-knockoff.png").into(mImageView);
     }
 
     /**
@@ -88,35 +97,14 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
     }
 
     @Override
-    public void onMessageReceived(MessageEvent messageEvent) {
-        final String path = messageEvent.getPath();
-        final String message = new String(messageEvent.getData());
-
-        if (elementList == null || elementList.isEmpty()) {
-
-            Log.d(TAG, "received mess message :" + path);
-
-            if (path.equals("nb_elements")) {
-                elementList = new ArrayList<>();
-                int nombre = Integer.parseInt(message);
-
-                Log.d(TAG, "nb elements to display :" + nombre);
-
-                for (int i = 0; i < nombre; ++i) {
-                    elementList.add(getElement(i));
-                }
-
-                startMainScreen();
-            }
-        }
-    }
+    public void onMessageReceived(MessageEvent messageEvent) {}
 
     public void startMainScreen() {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 if (pager != null && pager.getAdapter() == null)
-                    pager.setAdapter(new ElementGridPagerAdapter(elementList, getFragmentManager()));
+                    pager.setAdapter(new ElementGridPagerAdapter(MainActivity.this,elementList, getFragmentManager()));
             }
         });
     }
@@ -136,7 +124,24 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 
     @Override
     public void onDataChanged(DataEventBuffer dataEvents) {
-        DaVinci.with(this).onDataChanged(dataEvents);
+        for (DataEvent event : dataEvents) {
+
+            if (event.getType() == DataEvent.TYPE_CHANGED && event.getDataItem().getUri().getPath().startsWith("/elements/")) {
+                DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
+                List<DataMap> elementsDataMap = dataMapItem.getDataMap().getDataMapArrayList("/list/");
+
+                if (elementList == null || elementList.isEmpty()) {
+                    elementList = new ArrayList<>();
+
+                    for (DataMap dataMap : elementsDataMap) {
+                        elementList.add(getElement(dataMap));
+                    }
+
+                    startMainScreen();
+                }
+
+            }
+        }
     }
 
     protected Uri getUriForDataItem(String path) {
@@ -150,21 +155,12 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
         }
     }
 
-    public Element getElement(int index) {
-        final Uri uri = getUriForDataItem("/element/" + index);
-        if (uri != null) {
-            final DataApi.DataItemResult result = Wearable.DataApi.getDataItem(mApiClient, uri).await();
-            if (result != null && result.getDataItem() != null) {
-
-                final DataMapItem dataMapItem = DataMapItem.fromDataItem(result.getDataItem());
-                return new Element(
-                        dataMapItem.getDataMap().getString("title"),
-                        dataMapItem.getDataMap().getString("description"),
-                        dataMapItem.getDataMap().getString("url")
-                );
-            }
-        }
-        return null;
+    public Element getElement(DataMap elementDataMap) {
+        return new Element(
+                elementDataMap.getString("titre"),
+                elementDataMap.getString("description"),
+                elementDataMap.getString("url"));
     }
+
 
 }
